@@ -68,7 +68,7 @@ if [ -z "$IP" ]; then
     #external IP
     EIP=`curl -s checkip.dyndns.org | sed -e 's/.*Current IP Address: //' -e 's/<.*$//'`
     #internal IPv6 with mask
-    IIPv6=`ip -6 addr|grep inet6|grep fe80|awk -F '[ \t]+|' '{print $3}'`
+    IIPv6=`ip -6 addr|grep inet6|awk -F '[ \t]+|/' '{print $3}'|grep -v ^::1|grep -v ^fe80`
 
     echo "Select server IP to listen on (only used for IPv4):
     1) Internal IP - $IIP (in case you are behind NAT)
