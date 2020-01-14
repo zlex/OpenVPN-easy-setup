@@ -1,10 +1,11 @@
 #! /bin/bash
 #
 # Express setup of OpenVPN server 
-# for CentOS 7.x and Ubuntu Server 16.x / 17.x
-# by xl-tech https://github.com/xl-tech
+# for Debian 10.x
+# Originally by xl-tech https://github.com/xl-tech
+# Modified by r3bers https://github.com/r3bers
 #
-# Version 0.1 12 August 2017
+# Version 0.2 14 January 2020
 #
 # Use only on fresh installed machine! It can rewrite your firewall rules
 # or your current OpenVPN config (if you have it before).

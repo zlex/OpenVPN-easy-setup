@@ -1,7 +1,7 @@
 # OpenVPN-easy-setup
 Bash script for easy and fast OpenVPN server deploy
 
-For CentOS 7.x and Ubuntu Server 17.x only. (Ubuntu Server 16.x is supported, but it have OpenVPN 2.3.x)
+For Debian 10.x
 Use only on fresh installed machine. It will rewrite your iptables and OpenVPN configuration.
 
 Features:
