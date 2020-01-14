@@ -5,7 +5,7 @@
 # Originally by xl-tech https://github.com/xl-tech
 # Modified by r3bers https://github.com/r3bers
 #
-# Version 0.2 14 January 2020
+# Version 0.2 15 January 2020
 #
 # Use only on fresh installed machine! It can rewrite your firewall rules
 # or your current OpenVPN config (if you have it before).
@@ -15,13 +15,17 @@
 # Usage: just run openvpnsetup.sh :)
 #
 
-NET6="fd60:2e73:0dd5:57dc::/64" #can generate yours at https://simpledns.plus/private-ipv6
+NET6="fd60:1:1:1::/64" #can generate yours at https://simpledns.plus/private-ipv6
 NET4="192.168.100.0/24" 
+DNS1="192.168.100.1"
+DNS2="fd60:1:1:1::1"
+SSHPORT=22
 
 #Uncomment some options for less asking from console 
-IP="127.0.0.1"
+#IP="127.0.0.1"
 PORT="udp 1194"
 CIPHER=AES-256-GCM
+IPV6E=1
 
 #check for root
 IAM=$(whoami)
@@ -68,12 +72,14 @@ if [ -z "$IP" ]; then
 
     echo "Select server IP to listen on (only used for IPv4):
     1) Internal IP - $IIP (in case you are behind NAT)
-    2) External IP - $EIP"
+    2) External IP - $EIP
+    3) External IPv6 - $IIPv6"
     read n
     case $n in
-	1) IP=$IIP;;
-	2) IP=$EIP;;
-	*) invalid option;;
+    1) IP=$IIP;;
+    2) IP=$EIP;;
+    3) IP=$IIPv6;;
+    *) invalid option;;
     esac
 fi
 
@@ -84,10 +90,10 @@ if [ -z "$PORT" ]; then
     3) Enter manually (proto (lowercase!) port)"
     read n
     case $n in
-	1) PORT="tcp 443";;
-	2) PORT="udp 1194";;
-	3) echo -n "Enter proto and port (like tcp 80 or udp 53): " & read -e PORT;;
-	*) invalid option;;
+    1) PORT="tcp 443";;
+    2) PORT="udp 1194";;
+    3) echo -n "Enter proto and port (like tcp 80 or udp 53): " & read -e PORT;;
+    *) invalid option;;
     esac
 fi
 
@@ -104,24 +110,25 @@ if [ -z "$CIPHER" ]; then
     4) BF-CBC (insecure)"
     read n
     case $n in
-	1) CIPHER=AES-256-GCM;;
-	2) CIPHER=AES-256-CBC;;
-	3) CIPHER=AES-128-CBC;;
-	4) CIPHER=BF-CBC;;
-	*) invalid option;;
+    1) CIPHER=AES-256-GCM;;
+    2) CIPHER=AES-256-CBC;;
+    3) CIPHER=AES-128-CBC;;
+    4) CIPHER=BF-CBC;;
+    *) invalid option;;
     esac
 fi
 
-echo "Enable IPv6? (ensure that your machine have IPv6 support):
-1) Yes
-2) No
-"
-read n
-case $n in
-    1) IPV6E=1;;
-    2) IPV6E=0;;
-    *) invalid option;;
-esac
+if [ -z "$IPV6E" ]; then
+    echo "Enable IPv6? (ensure that your machine have IPv6 support):
+    1) Yes
+    2) No"
+    read n
+    case $n in
+        1) IPV6E=1;;
+        2) IPV6E=0;;
+        *) invalid option;;
+    esac
+fi
 
 echo "Check your selection"
 echo "Server will listen on $IP"
@@ -140,9 +147,7 @@ touch /etc/openvpn/easy-rsa/keys/index.txt
 touch /etc/openvpn/easy-rsa/keys/serial
 echo 00 >> /etc/openvpn/easy-rsa/keys/serial
 #copy easy-rsa
-if cat /etc/*release | grep ^NAME | grep CentOS; then
-    cp /usr/share/easy-rsa/2.0/* /etc/openvpn/easy-rsa
-elif cat /etc/*release | grep ^NAME | grep Ubuntu; then
+if cat /etc/*release | grep ^NAME | grep Debian; then
     cp /usr/share/easy-rsa/* /etc/openvpn/easy-rsa
 fi
 #vars for certs
@@ -196,7 +201,7 @@ else
 fi
 
 echo -e "#IPv6 config
-server-ipv6 fd6c:62d9:eb8c::/112
+server-ipv6 $NET6
 proto $PORTL6
 tun-ipv6
 push tun-ipv6
@@ -214,20 +219,20 @@ dev tun
 #for cert revoke check
 crl-verify /etc/openvpn/easy-rsa/keys/crl.pem
 
-server 10.1.0.0 255.255.255.0
+server $NET4 255.255.255.0
 topology subnet
 push \042redirect-gateway def1 bypass-dhcp\042
 
 #duplicate-cn
 
-push \042dhcp-option DNS 8.8.8.8\042
-push \042dhcp-option DNS 8.8.4.4\042
+push \042dhcp-option DNS $DNS1\042
+push \042dhcp-option DNS $DNS2\042
 
 comp-lzo adaptive
 push \042comp-lzo adaptive\042
 
 mssfix 0
-push \042mssfix 0\042
+#push \042mssfix 0\042
 
 #management 0.0.0.0 7000 /etc/openvpn/management-password
 
@@ -305,7 +310,7 @@ echo "*filter
 -A FORWARD -j XL-Firewall-1-INPUT
 -A XL-Firewall-1-INPUT -p icmp --icmp-type any -s localhost -j ACCEPT
 -A XL-Firewall-1-INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
--A XL-Firewall-1-INPUT -m state --state NEW -m tcp -p tcp --dport 22 -j ACCEPT
+-A XL-Firewall-1-INPUT -m state --state NEW -m tcp -p tcp --dport $SSHPORT -j ACCEPT
 -A XL-Firewall-1-INPUT -m state --state NEW -m $PORTL -p $PORTL --dport $PORTN -j ACCEPT
 -A XL-Firewall-1-INPUT -i tun+ -j ACCEPT
 -A XL-Firewall-1-INPUT -j REJECT --reject-with icmp-host-prohibited
@@ -321,7 +326,7 @@ COMMIT
 :PREROUTING ACCEPT [0:0]
 :POSTROUTING ACCEPT [0:0]
 :OUTPUT ACCEPT [0:0]
--A POSTROUTING -s 10.1.0.0/24 -j MASQUERADE
+-A POSTROUTING -s $NET4 -j SNAT --to-source $EIP
 COMMIT" > /tmp/iptables
 
 #create ip6tables file
@@ -335,6 +340,7 @@ echo "*filter
 -A XL-Firewall-1-INPUT -i lo -j ACCEPT
 -A XL-Firewall-1-INPUT -p icmpv6 -j ACCEPT
 -A XL-Firewall-1-INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+-A XL-Firewall-1-INPUT -m state --state NEW -m tcp -p tcp --dport $SSHPORT -j ACCEPT
 -A XL-Firewall-1-INPUT -m state --state NEW -m $PORTL -p $PORTL --dport $PORTN -j ACCEPT
 -A XL-Firewall-1-INPUT -i tun+ -j ACCEPT
 -A XL-Firewall-1-INPUT -j REJECT --reject-with icmp6-adm-prohibited
@@ -350,7 +356,7 @@ COMMIT
 :PREROUTING ACCEPT [0:0]
 :POSTROUTING ACCEPT [0:0]
 :OUTPUT ACCEPT [0:0]
--A POSTROUTING -s fd6c:62d9:eb8c::/112 -j MASQUERADE
+-A POSTROUTING -s $NET6 -j SNAT --to-source $IIPv6
 COMMIT" > /tmp/ip6tables
 
 #start services
@@ -377,7 +383,7 @@ dev tun
 dev-type tun
 
 #bind to interface if needed
-#dev-node \042Ethernet 4\042
+#dev-node \042Ethernet\042
 
 ns-cert-type server
 setenv opt tls-version-min 1.0 or-highest
@@ -398,7 +404,7 @@ mssfix 0
 verb 3
 ping 10
 tls-client
-float" >> /etc/openvpn/client.ovpn
+float" > /etc/openvpn/client.ovpn
 
 #generate bash script to create one-file config for clients
 
