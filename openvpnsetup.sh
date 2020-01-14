@@ -16,7 +16,12 @@
 #
 
 NET6="fd60:2e73:0dd5:57dc::/64" #can generate yours at https://simpledns.plus/private-ipv6
-NET4="192.168.100.0/24"
+NET4="192.168.100.0/24" 
+
+#Uncomment some options for less asking from console 
+IP="127.0.0.1"
+PORT="udp 1194"
+CIPHER=AES-256-GCM
 
 #check for root
 IAM=$(whoami)
@@ -32,7 +37,7 @@ else
     echo TUN/TAP is disabled. Contact your VPS provider to enable it
     exit 1
 fi
-	
+
 #enable IPv4 forwarding
 if sysctl net.ipv4.ip_forward |grep 0; then
     sysctl -w net.ipv4.ip_forward=1
@@ -53,55 +58,59 @@ else
 fi
 
 #server settings
-#internal IP
-IIP=`hostname -I`
-#external IP
-EIP=`curl -s checkip.dyndns.org | sed -e 's/.*Current IP Address: //' -e 's/<.*$//'`
-#internal IPv6 with mask
-IIPv6=`ip -6 addr|grep inet6|grep fe80|awk -F '[ \t]+|' '{print $3}'`
+if [ -z "$IP" ]; then
+    #internal IP
+    IIP=`hostname -I`
+    #external IP
+    EIP=`curl -s checkip.dyndns.org | sed -e 's/.*Current IP Address: //' -e 's/<.*$//'`
+    #internal IPv6 with mask
+    IIPv6=`ip -6 addr|grep inet6|grep fe80|awk -F '[ \t]+|' '{print $3}'`
 
-echo "Select server IP to listen on (only used for IPv4):
-1) Internal IP - $IIP (in case you are behind NAT)
-2) External IP - $EIP
-"
-read n
-case $n in
-    1) IP=$IIP;;
-    2) IP=$EIP;;
-    *) invalid option;;
-esac
+    echo "Select server IP to listen on (only used for IPv4):
+    1) Internal IP - $IIP (in case you are behind NAT)
+    2) External IP - $EIP"
+    read n
+    case $n in
+	1) IP=$IIP;;
+	2) IP=$EIP;;
+	*) invalid option;;
+    esac
+fi
 
-echo "Select server PORT to listen on:
-1) tcp 443 (recommended)
-2) udp 1194 (default)
-3) Enter manually (proto (lowercase!) port)
-"
-read n
-case $n in
-    1) PORT="tcp 443";;
-    2) PORT="udp 1194";;
-    3) echo -n "Enter proto and port (like tcp 80 or udp 53): " & read -e PORT;;
-    *) invalid option;;
-esac
+if [ -z "$PORT" ]; then
+    echo "Select server PORT to listen on:
+    1) tcp 443 (recommended)
+    2) udp 1194 (default)
+    3) Enter manually (proto (lowercase!) port)"
+    read n
+    case $n in
+	1) PORT="tcp 443";;
+	2) PORT="udp 1194";;
+	3) echo -n "Enter proto and port (like tcp 80 or udp 53): " & read -e PORT;;
+	*) invalid option;;
+    esac
+fi
 
 PORTN=`echo $PORT|grep -o '[0-9]*'`
 PORTL=`echo $PORT|grep -o '[a-z,A-Z]*'`
 PORTL6=$PORTL"6"
 
-echo "Select server cipher:
-1) AES-256-GCM (default for OpenVPN 2.4.x, not supported by Ubuntu Server 16.x)
-2) AES-256-CBC
-3) AES-128-CBC (default for OpenVPN 2.3.x)
-4) BF-CBC (insecure)
-"
-read n
-case $n in
-    1) CIPHER=AES-256-GCM;;
-    2) CIPHER=AES-256-CBC;;
-    3) CIPHER=AES-128-CBC;;
-    4) CIPHER=BF-CBC;;
-    *) invalid option;;
-esac
+
+if [ -z "$CIPHER" ]; then
+    echo "Select server cipher:
+    1) AES-256-GCM (default for OpenVPN 2.4.x, not supported by Ubuntu Server 16.x)
+    2) AES-256-CBC
+    3) AES-128-CBC (default for OpenVPN 2.3.x)
+    4) BF-CBC (insecure)"
+    read n
+    case $n in
+	1) CIPHER=AES-256-GCM;;
+	2) CIPHER=AES-256-CBC;;
+	3) CIPHER=AES-128-CBC;;
+	4) CIPHER=BF-CBC;;
+	*) invalid option;;
+    esac
+fi
 
 echo "Enable IPv6? (ensure that your machine have IPv6 support):
 1) Yes
@@ -148,11 +157,11 @@ export PKCS11_PIN="dummy"
 export KEY_SIZE=2048
 export CA_EXPIRE=3650
 export KEY_EXPIRE=1825
-export KEY_COUNTRY="US"
-export KEY_PROVINCE="CA"
-export KEY_CITY="SanFrancisco"
-export KEY_ORG="Fort-Funston"
-export KEY_EMAIL="my@vpn.net"
+export KEY_COUNTRY="RU"
+export KEY_PROVINCE="MSK"
+export KEY_CITY="Moscow"
+export KEY_ORG="Solovjov.NET"
+export KEY_EMAIL="vpn@solovjov.net"
 export KEY_OU="MyVPN"
 export KEY_NAME="EasyRSA"
 
