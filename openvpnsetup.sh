@@ -15,6 +15,9 @@
 # Usage: just run openvpnsetup.sh :)
 #
 
+NET6="fd60:2e73:0dd5:57dc::/64" #can generate yours at https://simpledns.plus/private-ipv6
+NET4="192.168.100.0/24"
+
 #check for root
 IAM=$(whoami)
 if [ ${IAM} != "root" ]; then
@@ -39,14 +42,9 @@ else
 fi
 
 #package install
-yum_packages="openssl openvpn easy-rsa iptables iptables-services curl"
 deb_packages="openssl openvpn easy-rsa iptables netfilter-persistent iptables-persistent curl"
 
-if cat /etc/*release | grep ^NAME | grep CentOS; then
-    yum -y install epel-release
-    yum -y install $yum_packages
-    systemctl disable firewalld & systemctl stop firewalld
-elif cat /etc/*release | grep ^NAME | grep Ubuntu; then
+if cat /etc/*release | grep ^NAME | grep Debian; then
     apt-get install -y $deb_packages
     ufw disable
 else
@@ -177,6 +175,7 @@ echo "Error 23 indicates that revoke is successful"
 #generate server config
 
 #ipv6 part
+$NET6 - 
 if (( "$IPV6E" == 1 )); then
 
 #enable IPv6 forwarding
@@ -193,7 +192,6 @@ proto $PORTL6
 tun-ipv6
 push tun-ipv6
 push \042route-ipv6 2000::/3\042
-push \042redirect-gateway ipv6\042
 " > /etc/openvpn/server.conf
 else
 echo "local $IP" > /etc/openvpn/server.conf
