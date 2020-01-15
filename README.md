@@ -14,7 +14,9 @@ Features:
 Usage: ./openvpnsetup.sh 
 
 Before enabling IPv6 support ensure that your machine have IPv6 address.
-Note: iptables rule allow port 22 tcp (ssh) by default, if you have sshd on another port modify script before execution.
+Notes:
+  - iptables rule allow port 22 tcp (ssh) by default, if you have sshd on another port modify script before execution.
+  - Ports and Nets can be configured in vars on top of script.
 
 After script is complete you can create client config files in unified format with /etc/openvpn/newclient.sh script.
 Usage: ./newclient.sh clientname
