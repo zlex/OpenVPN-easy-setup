@@ -148,48 +148,50 @@ touch /etc/openvpn/easy-rsa/keys/serial
 echo 00 >> /etc/openvpn/easy-rsa/keys/serial
 #copy easy-rsa
 if cat /etc/*release | grep ^NAME | grep Debian; then
-    cp /usr/share/easy-rsa/* /etc/openvpn/easy-rsa
+    cp -a /usr/share/easy-rsa/* /etc/openvpn/easy-rsa
 fi
+
 #vars for certs
-export EASY_RSA="/etc/openvpn/easy-rsa"
-export OPENSSL="openssl"
-export PKCS11TOOL="pkcs11-tool"
-export GREP="grep"
-export KEY_CONFIG=`$EASY_RSA/whichopensslcnf $EASY_RSA`
-export KEY_DIR="$EASY_RSA/keys"
-export PKCS11_MODULE_PATH="dummy"
-export PKCS11_PIN="dummy"
+export EASYRSA="/etc/openvpn/easy-rsa"
+export EASYRSA_PKI="$EASYRSA/keys"
 export KEY_SIZE=2048
 export CA_EXPIRE=3650
 export KEY_EXPIRE=1825
 export KEY_COUNTRY="RU"
 export KEY_PROVINCE="MSK"
 export KEY_CITY="Moscow"
-export KEY_ORG="Solovjov.NET"
+export KEY_ORG="MyVPN.org"
 export KEY_EMAIL="vpn@solovjov.net"
+export KEY_CN="MyVPN"
 export KEY_OU="MyVPN"
 export KEY_NAME="EasyRSA"
 
 #issue certs and keys
+#init
+#export EASYRSA="${EASY_RSA:-.}"
+#export EASYRSA_PKI="${KEY_DIR:-.}"
+"$EASYRSA/easyrsa" --batch init-pki
 #ca
-export EASY_RSA="${EASY_RSA:-.}"
-"$EASY_RSA/pkitool" --batch --initca $*
-#server
-export EASY_RSA="${EASY_RSA:-.}"
-"$EASY_RSA/pkitool" --batch --server server-cert
+#export EASYRSA="${EASY_RSA:-.}"
+#export EASYRSA_PKI="${KEY_DIR:-.}"
+"$EASYRSA/easyrsa" --batch build-ca
 #dh
-$OPENSSL dhparam -out ${KEY_DIR}/dh.pem ${KEY_SIZE}
+#export EASYRSA="${EASY_RSA:-.}"
+#export EASYRSA_PKI="${KEY_DIR:-.}"
+"$EASYRSA/easyrsa" --batch gen-dh 2048
+#server
+#export EASYRSA="${EASY_RSA:-.}"
+#export EASYRSA_PKI="${KEY_DIR:-.}"
+"$EASYRSA/easyrsa" --batch gen-req vpn-server nopass
+"$EASYRSA/easyrsa" --batch sign-req server vpn-server
 #ta
-openvpn --genkey --secret ${KEY_DIR}/ta.key
-#issue and revoke client cert to generate list of revoked certs
-"$EASY_RSA/pkitool" --batch revoked
-"$EASY_RSA/revoke-full" revoked
-echo "Error 23 indicates that revoke is successful"
+openvpn --genkey --secret ${EASYRSA_PKI}/ta.key
+#update db
+"$EASYRSA/easyrsa" --batch update-db
 
 #generate server config
 
 #ipv6 part
-$NET6 - 
 if (( "$IPV6E" == 1 )); then
 
 #enable IPv6 forwarding
