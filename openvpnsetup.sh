@@ -20,12 +20,15 @@ NET4="192.168.100.0/24"
 DNS1="192.168.100.1"
 DNS2="fd60:1:1:1::1"
 SSHPORT=22
+export EASYRSA="/etc/openvpn/easy-rsa"
+export EASYRSA_PKI="$EASYRSA/pki"
 
 #Uncomment some options for less asking from console 
-#IP="127.0.0.1"
+IP="127.0.0.1"
 PORT="udp 1194"
 CIPHER=AES-256-GCM
 IPV6E=1
+NO_PASS="nopass" # Generete CA key without password 
 
 #check for root
 IAM=$(whoami)
@@ -139,55 +142,69 @@ read -rsp $'Press enter to continue...\n'
 
 #create dirs and files
 mkdir /etc/openvpn/easy-rsa
-mkdir /etc/openvpn/easy-rsa/keys
+#mkdir /etc/openvpn/easy-rsa/keys
 mkdir /etc/openvpn/logs
 mkdir /etc/openvpn/bundles
 mkdir /etc/openvpn/ccd
-touch /etc/openvpn/easy-rsa/keys/index.txt
-touch /etc/openvpn/easy-rsa/keys/serial
-echo 00 >> /etc/openvpn/easy-rsa/keys/serial
+#touch /etc/openvpn/easy-rsa/keys/index.txt
+#touch /etc/openvpn/easy-rsa/keys/serial
+#echo 00 >> /etc/openvpn/easy-rsa/keys/serial
 #copy easy-rsa
 if cat /etc/*release | grep ^NAME | grep Debian; then
     cp -a /usr/share/easy-rsa/* /etc/openvpn/easy-rsa
 fi
 
-#vars for certs
-export EASYRSA="/etc/openvpn/easy-rsa"
-export EASYRSA_PKI="$EASYRSA/keys"
-export KEY_SIZE=2048
-export CA_EXPIRE=3650
-export KEY_EXPIRE=1825
-export KEY_COUNTRY="RU"
-export KEY_PROVINCE="MSK"
-export KEY_CITY="Moscow"
-export KEY_ORG="MyVPN.org"
-export KEY_EMAIL="vpn@solovjov.net"
-export KEY_CN="MyVPN"
-export KEY_OU="MyVPN"
-export KEY_NAME="EasyRSA"
+echo -e "set_var EASYRSA \"$EASYRSA\"
+set_var EASYRSA_PKI \"$EASYRSA_PKI\"
+set_var EASYRSA_CERT_EXPIRE 1825
+set_var EASYRSA_CA_EXPIRE 3650
+set_var EASYRSA_CRL_DAYS 180
+set_var EASYRSA_DIGEST sha256
+set_var EASYRSA_KEY_SIZE 2048
+set_var EASYRSA_DN cn_only
+set_var EASYRSA_REQ_COUNTRY \"RU\"
+set_var EASYRSA_REQ_PROVINCE \"MSK\"
+set_var EASYRSA_REQ_CITY \"Moscow\"
+set_var EASYRSA_REQ_ORG \"MyVPN.org\"
+set_var EASYRSA_REQ_OU \"MyVPN\"
+set_var EASYRSA_REQ_CN \"MyVPN\"
+set_var EASYRSA_REQ_EMAIL \"vpn@MyVPN.org\"
+" > /etc/openvpn/easy-rsa/vars
 
 #issue certs and keys
 #init
-#export EASYRSA="${EASY_RSA:-.}"
-#export EASYRSA_PKI="${KEY_DIR:-.}"
 "$EASYRSA/easyrsa" --batch init-pki
+
 #ca
-#export EASYRSA="${EASY_RSA:-.}"
-#export EASYRSA_PKI="${KEY_DIR:-.}"
-"$EASYRSA/easyrsa" --batch build-ca
+/bin/false # Make Exit code 1 for cycle
+until [ $? -eq 0 ]
+do
+"$EASYRSA/easyrsa" --batch build-ca ${NO_PASS}
+done
+
+#crl
+/bin/false # Make Exit code 1 for cycle
+until [ $? -eq 0 ]
+do
+"$EASYRSA/easyrsa" --batch gen-crl
+done
+
 #dh
-#export EASYRSA="${EASY_RSA:-.}"
-#export EASYRSA_PKI="${KEY_DIR:-.}"
-"$EASYRSA/easyrsa" --batch gen-dh 2048
+"$EASYRSA/easyrsa" --batch gen-dh
+
 #server
-#export EASYRSA="${EASY_RSA:-.}"
-#export EASYRSA_PKI="${KEY_DIR:-.}"
 "$EASYRSA/easyrsa" --batch gen-req vpn-server nopass
+/bin/false # Make Exit code 1 for cycle
+until [ $? -eq 0 ]
+do
 "$EASYRSA/easyrsa" --batch sign-req server vpn-server
+done
+
 #ta
 openvpn --genkey --secret ${EASYRSA_PKI}/ta.key
+
 #update db
-"$EASYRSA/easyrsa" --batch update-db
+#"$EASYRSA/easyrsa" --batch update-db
 
 #generate server config
 
@@ -274,32 +291,32 @@ push \042rcvbuf 393216\042
 " >> /etc/openvpn/server.conf
 
 echo "<ca>"  >> /etc/openvpn/server.conf
-cat $KEY_DIR/ca.crt >> /etc/openvpn/server.conf
+cat $EASYRSA_PKI/ca.crt >> /etc/openvpn/server.conf
 echo "</ca>" >> /etc/openvpn/server.conf
 
 echo "<cert>"  >> /etc/openvpn/server.conf
-cat $KEY_DIR/server-cert.crt >> /etc/openvpn/server.conf
+cat $EASYRSA_PKI/issued/vpn-server.crt >> /etc/openvpn/server.conf
 echo "</cert>" >> /etc/openvpn/server.conf
 
 echo "<key>"  >> /etc/openvpn/server.conf
-cat $KEY_DIR/server-cert.key >> /etc/openvpn/server.conf
+cat $EASYRSA_PKI/private/vpn-server.key >> /etc/openvpn/server.conf
 echo "</key>" >> /etc/openvpn/server.conf
 
 if openvpn --version | grep 2.3; then
     # ta tls auth OpenVPN 2.3.x
     echo "key-direction 0" >> /etc/openvpn/server.conf
     echo "<tls-auth>"  >> /etc/openvpn/server.conf
-    cat $KEY_DIR/ta.key >> /etc/openvpn/server.conf
+    cat $EASYRSA_PKI/ta.key >> /etc/openvpn/server.conf
     echo "</tls-auth>" >> /etc/openvpn/server.conf
 else
     # ta tls crypt OpenVPN 2.4.x
     echo "<tls-crypt>"  >> /etc/openvpn/server.conf
-    cat $KEY_DIR/ta.key >> /etc/openvpn/server.conf
+    cat $EASYRSA_PKI/ta.key >> /etc/openvpn/server.conf
     echo "</tls-crypt>" >> /etc/openvpn/server.conf
 fi
 
 echo "<dh>"  >> /etc/openvpn/server.conf
-cat $KEY_DIR/dh.pem >> /etc/openvpn/server.conf
+cat $EASYRSA_PKI/dh.pem >> /etc/openvpn/server.conf
 echo "</dh>" >> /etc/openvpn/server.conf
 
 #create iptables file
@@ -387,13 +404,13 @@ dev-type tun
 #bind to interface if needed
 #dev-node \042Ethernet\042
 
-ns-cert-type server
+remote-cert-tls server
 setenv opt tls-version-min 1.0 or-highest
 #block local dns
 setenv opt block-outside-dns
 nobind
 
-remote $EIP $PORTN $PORTL 
+remote $EIP $PORTN $PORTL
 
 cipher $CIPHER
 auth SHA256
@@ -402,7 +419,8 @@ resolv-retry infinite
 persist-key
 persist-tun
 comp-lzo
-mssfix 0
+mssfix max
+auth-nocache
 verb 3
 ping 10
 tls-client
@@ -415,9 +433,10 @@ echo -e "#! /bin/bash
 #
 # H Cooper - 05/02/11
 # Y Frolov - 08/06/16 - bundle config added (unified format)
+# M Solovev - 15/01/20 - Migrate from pkitool EasyRSA 2.x to EasyRSA 3.x
 # Usage: newclient.sh <common-name>
 
-echo \042Script to generate unified config for Windows App\042
+echo \042Script to generate unified config for OprnVPN Apps\042
 echo \042sage: newclient.sh <common-name>\042
 
 # Set vars
