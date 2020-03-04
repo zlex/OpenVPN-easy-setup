@@ -20,8 +20,9 @@ NET4="192.168.100.0/24"
 DNS1="192.168.100.1"
 DNS2="fd60:1:1:1::1"
 SSHPORT=22
-export EASYRSA="/etc/openvpn/easy-rsa"
-export EASYRSA_PKI="$EASYRSA/pki"
+export OPENVPN_DIR=/etc/openvpn
+export EASYRSA=$OPENVPN_DIR/easy-rsa
+export EASYRSA_PKI=$EASYRSA/pki
 
 #Uncomment some options for less asking from console
 #IP="0.0.0.0"
@@ -147,12 +148,12 @@ echo "IPv6 - $IPV6E (1 is enabled, 0 is disabled)"
 read -rsp $'Press enter to continue...\n'
 
 #create dirs and files
-mkdir /etc/openvpn/easy-rsa
-mkdir /etc/openvpn/bundles
-mkdir /etc/openvpn/ccd
+mkdir $EASYRSA
+mkdir $OPENVPN_DIR/bundles
+mkdir $OPENVPN_DIR/ccd
 
 #copy easy-rsa
-cp -a /usr/share/easy-rsa/* /etc/openvpn/easy-rsa
+cp -a /usr/share/easy-rsa/* $EASYRSA
 
 echo -e "set_var EASYRSA \"$EASYRSA\"
 set_var EASYRSA_PKI \"$EASYRSA_PKI\"
@@ -169,7 +170,7 @@ set_var EASYRSA_REQ_ORG \"MyVPN.org\"
 set_var EASYRSA_REQ_OU \"MyVPN\"
 set_var EASYRSA_REQ_CN \"MyVPN\"
 set_var EASYRSA_REQ_EMAIL \"vpn@MyVPN.org\"
-" >/etc/openvpn/easy-rsa/vars
+" >$EASYRSA/vars
 
 #issue certs and keys
 #init
@@ -220,9 +221,9 @@ tun-ipv6
 push tun-ipv6
 push \042route-ipv6 2000::/3\042
 push \042redirect-gateway ipv6\042
-" >/etc/openvpn/server.conf
+" >$OPENVPN_DIR/server.conf
 else
-    echo "local $IP" >/etc/openvpn/server.conf
+    echo "local $IP" >$OPENVPN_DIR/server.conf
 fi
 
 #main part
@@ -253,7 +254,7 @@ mssfix 0
 push \042mssfix 0\042
 #push \042tun-mtu 1492\042
 
-#management 0.0.0.0 7000 /etc/openvpn/management-password
+#management 0.0.0.0 7000 $OPENVPN_DIR/management-password
 
 #duplicate-cn
 keepalive 10 120
@@ -310,7 +311,7 @@ push \042rcvbuf 1048576\042
     echo "<dh>"
     cat $EASYRSA_PKI/dh.pem
     echo "</dh>"
-} >>/etc/openvpn/server.conf
+} >>$OPENVPN_DIR/server.conf
 
 #create iptables file
 echo "*filter
@@ -408,7 +409,7 @@ auth-nocache
 verb 3
 ping 10
 tls-client
-float" >/etc/openvpn/client.ovpn
+float" >$OPENVPN_DIR/client.ovpn
 
 #generate bash script to create one-file config for clients
 
@@ -424,7 +425,7 @@ echo \042Script to generate unified config for OpenVPN Apps\042
 echo \042sage: newclient.sh <common-name>\042
 
 # Set vars
-OPENVPN_DIR=/etc/openvpn
+OPENVPN_DIR=$OPENVPN_DIR
 EASY_RSA=\044OPENVPN_DIR/easy-rsa
 EASYRSA_PKI=\044EASY_RSA/pki
 BUNDLE_DIR=\044OPENVPN_DIR/bundles
@@ -451,7 +452,7 @@ if [ -f \044EASYRSA_PKI/issued/\044CN.crt ]
 fi
 
 # Generating Full Client package
-\042/etc/openvpn/easy-rsa/easyrsa\042 build-client-full \044CN nopass
+\042\044EASY_RSA/easyrsa\042 build-client-full \044CN nopass
 
 # Add all certs to unified client config file
 
@@ -480,10 +481,10 @@ cp \044OPENVPN_DIR/client.ovpn \044BUNDLE_DIR/\044CN.ovpn
     echo \042</tls-crypt>\042
 } >> \044BUNDLE_DIR/\044CN.ovpn
 
-echo \042COMPLETE! Copy the new unified config from here: /etc/openvpn/bundles/\044CN.ovpn\042" >/etc/openvpn/newclient.sh
-chmod +x /etc/openvpn/newclient.sh
+echo \042COMPLETE! Copy the new unified config from here: $OPENVPN_DIR/bundles/\044CN.ovpn\042" >$OPENVPN_DIR/newclient.sh
+chmod +x $OPENVPN_DIR/newclient.sh
 
 echo "Setup is complete. Happy VPNing!"
-echo "Use /etc/openvpn/newclient.sh to generate client config"
+echo "Use $OPENVPN_DIR/newclient.sh to generate client config"
 
 exit 0
