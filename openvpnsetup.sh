@@ -1,7 +1,7 @@
-#! /bin/bash
+#!/bin/bash
 #
-# Express setup of OpenVPN server 
-# for Debian 10.x
+# Express setup of OpenVPN server
+# for Debian 10.x and Ubuntu 19.x and Later
 # Originally by xl-tech https://github.com/xl-tech
 # Modified by r3bers https://github.com/r3bers
 #
@@ -24,7 +24,7 @@ export EASYRSA="/etc/openvpn/easy-rsa"
 export EASYRSA_PKI="$EASYRSA/pki"
 
 #Uncomment some options for less asking from console 
-IP="127.0.0.1"
+IP="0.0.0.0"
 PORT="udp 1194"
 CIPHER=AES-256-GCM
 IPV6E=1
@@ -535,4 +535,4 @@ chmod +x /etc/openvpn/newclient.sh
 echo "Setup is complete. Happy VPNing!"
 echo "Use /etc/openvpn/newclient.sh to generate client config"
 
-exit 1
+exit 0
