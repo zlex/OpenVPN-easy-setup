@@ -1,7 +1,7 @@
 # OpenVPN-easy-setup
 Bash script for easy and fast OpenVPN server deploy
 
-For Debian 10.x
+For  Debian 10.x and Ubuntu 19.x and later
 Use only on fresh installed machine. It will rewrite your iptables and OpenVPN configuration.
 
 Features:
