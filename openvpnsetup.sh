@@ -250,8 +250,10 @@ push \042dhcp-option DNS $DNS2\042
 comp-lzo adaptive
 push \042comp-lzo adaptive\042
 
-mssfix 0
-#push \042mssfix 0\042
+mssfix 1432
+tun-mtu 1500
+#push \042mssfix 1400\042
+#push \042tun-mtu 1492\042
 
 #management 0.0.0.0 7000 /etc/openvpn/management-password
 
@@ -284,10 +286,10 @@ tls-server
 #script-security 3
 
 #buffers
-sndbuf 393216
-rcvbuf 393216
-push \042sndbuf 393216\042
-push \042rcvbuf 393216\042
+sndbuf 1048576
+rcvbuf 1048576
+push \042sndbuf 1048576\042
+push \042rcvbuf 1048576\042
 " >> /etc/openvpn/server.conf
 
 echo "<ca>"  >> /etc/openvpn/server.conf
