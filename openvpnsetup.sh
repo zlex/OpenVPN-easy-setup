@@ -5,7 +5,7 @@
 # Originally by xl-tech https://github.com/xl-tech
 # Modified by r3bers https://github.com/r3bers
 #
-# Version 0.2 15 January 2020
+# Version 0.21  March 2020
 #
 # Use only on fresh installed machine! It can rewrite your firewall rules
 # or your current OpenVPN config (if you have it before).
@@ -16,23 +16,23 @@
 #
 
 NET6="fd60:1:1:1::/64" #can generate yours at https://simpledns.plus/private-ipv6
-NET4="192.168.100.0/24" 
+NET4="192.168.100.0/24"
 DNS1="192.168.100.1"
 DNS2="fd60:1:1:1::1"
 SSHPORT=22
 export EASYRSA="/etc/openvpn/easy-rsa"
 export EASYRSA_PKI="$EASYRSA/pki"
 
-#Uncomment some options for less asking from console 
-IP="0.0.0.0"
-PORT="udp 1194"
-CIPHER=AES-256-GCM
-IPV6E=1
-NO_PASS="nopass" # Generete CA key without password 
+#Uncomment some options for less asking from console
+#IP="0.0.0.0"
+#PORT="udp 1194"
+#CIPHER=AES-256-GCM
+#IPV6E=1
+NO_PASS="nopass" # Generete CA key without password
 
 #check for root
 IAM=$(whoami)
-if [ ${IAM} != "root" ]; then
+if [ "${IAM}" != "root" ]; then
     echo "You must be root to use this script"
     exit 1
 fi
@@ -46,9 +46,9 @@ else
 fi
 
 #enable IPv4 forwarding
-if sysctl net.ipv4.ip_forward |grep 0; then
+if sysctl net.ipv4.ip_forward | grep 0; then
     sysctl -w net.ipv4.ip_forward=1
-    echo "net.ipv4.ip_forward = 1" >> /etc/sysctl.conf
+    echo "net.ipv4.ip_forward = 1" >>/etc/sysctl.conf
 else
     echo "IPv4 forwarding is already enabled"
 fi
@@ -56,33 +56,37 @@ fi
 #package install
 deb_packages="openssl openvpn easy-rsa iptables netfilter-persistent iptables-persistent curl"
 
-if cat /etc/*release | grep ^NAME | grep Debian; then
-    apt-get install -y $deb_packages
-    ufw disable
+if cat /etc/*release | grep ^NAME | grep "Debian\|Ubuntu"; then
+    apt-get install -y "$deb_packages"
+    if hash ufw 2>/dev/null; then
+        ufw disable
+    else
+        echo "UFW not installed"
+    fi
 else
     echo "Unsupported distro, sorry"
-    exit 1;
+    exit 1
 fi
 
 #server settings
 if [ -z "$IP" ]; then
     #internal IP
-    IIP=`hostname -I`
+    IIP=$(hostname -I)
     #external IP
-    EIP=`curl -s checkip.dyndns.org | sed -e 's/.*Current IP Address: //' -e 's/<.*$//'`
+    EIP=$(curl -s checkip.dyndns.org | sed -e 's/.*Current IP Address: //' -e 's/<.*$//')
     #internal IPv6 with mask
-    IIPv6=`ip -6 addr|grep inet6|awk -F '[ \t]+|/' '{print $3}'|grep -v ^::1|grep -v ^fe80`
+    IIPv6=$(ip -6 addr | grep inet6 | awk -F '[ \t]+|/' '{print $3}' | grep -v ^::1 | grep -v ^fe80)
 
     echo "Select server IP to listen on (only used for IPv4):
     1) Internal IP - $IIP (in case you are behind NAT)
     2) External IP - $EIP
     3) External IPv6 - $IIPv6"
-    read n
+    read -r n
     case $n in
-    1) IP=$IIP;;
-    2) IP=$EIP;;
-    3) IP=$IIPv6;;
-    *) invalid option;;
+    1) IP=$IIP ;;
+    2) IP=$EIP ;;
+    3) IP=$IIPv6 ;;
+    *) invalid option ;;
     esac
 fi
 
@@ -91,19 +95,21 @@ if [ -z "$PORT" ]; then
     1) tcp 443 (recommended)
     2) udp 1194 (default)
     3) Enter manually (proto (lowercase!) port)"
-    read n
+    read -r n
     case $n in
-    1) PORT="tcp 443";;
-    2) PORT="udp 1194";;
-    3) echo -n "Enter proto and port (like tcp 80 or udp 53): " & read -e PORT;;
-    *) invalid option;;
+    1) PORT="tcp 443" ;;
+    2) PORT="udp 1194" ;;
+    3)
+        echo -n "Enter proto and port (like tcp 80 or udp 53): " &
+        read -re PORT
+        ;;
+    *) invalid option ;;
     esac
 fi
 
-PORTN=`echo $PORT|grep -o '[0-9]*'`
-PORTL=`echo $PORT|grep -o '[a-z,A-Z]*'`
+PORTN=$(echo "$PORT" | grep -o '[0-9]*')
+PORTL=$(echo "$PORT" | grep -o '[a-z,A-Z]*')
 PORTL6=$PORTL"6"
-
 
 if [ -z "$CIPHER" ]; then
     echo "Select server cipher:
@@ -111,13 +117,13 @@ if [ -z "$CIPHER" ]; then
     2) AES-256-CBC
     3) AES-128-CBC (default for OpenVPN 2.3.x)
     4) BF-CBC (insecure)"
-    read n
+    read -r n
     case $n in
-    1) CIPHER=AES-256-GCM;;
-    2) CIPHER=AES-256-CBC;;
-    3) CIPHER=AES-128-CBC;;
-    4) CIPHER=BF-CBC;;
-    *) invalid option;;
+    1) CIPHER=AES-256-GCM ;;
+    2) CIPHER=AES-256-CBC ;;
+    3) CIPHER=AES-128-CBC ;;
+    4) CIPHER=BF-CBC ;;
+    *) invalid option ;;
     esac
 fi
 
@@ -125,11 +131,11 @@ if [ -z "$IPV6E" ]; then
     echo "Enable IPv6? (ensure that your machine have IPv6 support):
     1) Yes
     2) No"
-    read n
+    read -r n
     case $n in
-        1) IPV6E=1;;
-        2) IPV6E=0;;
-        *) invalid option;;
+    1) IPV6E=1 ;;
+    2) IPV6E=0 ;;
+    *) invalid option ;;
     esac
 fi
 
@@ -142,17 +148,11 @@ read -rsp $'Press enter to continue...\n'
 
 #create dirs and files
 mkdir /etc/openvpn/easy-rsa
-#mkdir /etc/openvpn/easy-rsa/keys
-mkdir /etc/openvpn/logs
 mkdir /etc/openvpn/bundles
 mkdir /etc/openvpn/ccd
-#touch /etc/openvpn/easy-rsa/keys/index.txt
-#touch /etc/openvpn/easy-rsa/keys/serial
-#echo 00 >> /etc/openvpn/easy-rsa/keys/serial
+
 #copy easy-rsa
-if cat /etc/*release | grep ^NAME | grep Debian; then
-    cp -a /usr/share/easy-rsa/* /etc/openvpn/easy-rsa
-fi
+cp -a /usr/share/easy-rsa/* /etc/openvpn/easy-rsa
 
 echo -e "set_var EASYRSA \"$EASYRSA\"
 set_var EASYRSA_PKI \"$EASYRSA_PKI\"
@@ -169,74 +169,70 @@ set_var EASYRSA_REQ_ORG \"MyVPN.org\"
 set_var EASYRSA_REQ_OU \"MyVPN\"
 set_var EASYRSA_REQ_CN \"MyVPN\"
 set_var EASYRSA_REQ_EMAIL \"vpn@MyVPN.org\"
-" > /etc/openvpn/easy-rsa/vars
+" >/etc/openvpn/easy-rsa/vars
 
 #issue certs and keys
 #init
 "$EASYRSA/easyrsa" --batch init-pki
 
 #ca
-/bin/false # Make Exit code 1 for cycle
-until [ $? -eq 0 ]
-do
-"$EASYRSA/easyrsa" --batch build-ca ${NO_PASS}
-done
+if ! "$EASYRSA/easyrsa" --batch build-ca ${NO_PASS}; then
+    echo "Build CA failed"
+    exit 1
+fi
 
 #crl
-/bin/false # Make Exit code 1 for cycle
-until [ $? -eq 0 ]
-do
-"$EASYRSA/easyrsa" --batch gen-crl
-done
+if ! "$EASYRSA/easyrsa" --batch gen-crl; then
+    echo "Build CRL failed"
+    exit 1
+fi
 
 #dh
 "$EASYRSA/easyrsa" --batch gen-dh
 
 #server
 "$EASYRSA/easyrsa" --batch gen-req vpn-server nopass
-/bin/false # Make Exit code 1 for cycle
-until [ $? -eq 0 ]
-do
-"$EASYRSA/easyrsa" --batch sign-req server vpn-server
-done
+if ! "$EASYRSA/easyrsa" --batch sign-req server vpn-server; then
+    echo "Sign server cert request failed"
+    exit 1
+fi
 
 #ta
 openvpn --genkey --secret ${EASYRSA_PKI}/ta.key
 
-#update db
-#"$EASYRSA/easyrsa" --batch update-db
-
 #generate server config
 
 #ipv6 part
-if (( "$IPV6E" == 1 )); then
+if (("$IPV6E" == 1)); then
 
-#enable IPv6 forwarding
-if sysctl net.ipv6.conf.all.forwarding |grep 0; then
-    sysctl -w net.ipv6.conf.all.forwarding=1
-    echo "net.ipv6.conf.all.forwarding = 1" >> /etc/sysctl.conf
-else
-    echo "IPv6 forwarding is already enabled"
-fi
+    #enable IPv6 forwarding
+    if sysctl net.ipv6.conf.all.forwarding | grep 0; then
+        sysctl -w net.ipv6.conf.all.forwarding=1
+        echo "net.ipv6.conf.all.forwarding = 1" >>/etc/sysctl.conf
+    else
+        echo "IPv6 forwarding is already enabled"
+    fi
 
-echo -e "#IPv6 config
+    echo -e "#IPv6 config
 server-ipv6 $NET6
 proto $PORTL6
 tun-ipv6
 push tun-ipv6
 push \042route-ipv6 2000::/3\042
-" > /etc/openvpn/server.conf
+push \042redirect-gateway ipv6\042
+" >/etc/openvpn/server.conf
 else
-echo "local $IP" > /etc/openvpn/server.conf
+    echo "local $IP" >/etc/openvpn/server.conf
 fi
 
 #main part
-echo -e "port $PORTN
+{
+    echo -e "port $PORTN
 proto $PORTL
 dev tun
 
 #for cert revoke check
-crl-verify /etc/openvpn/easy-rsa/keys/crl.pem
+crl-verify $EASYRSA_PKI/crl.pem
 
 server $NET4 255.255.255.0
 topology subnet
@@ -250,9 +246,11 @@ push \042dhcp-option DNS $DNS2\042
 comp-lzo adaptive
 push \042comp-lzo adaptive\042
 
-mssfix 1432
-tun-mtu 1500
-#push \042mssfix 1400\042
+#tun-mtu 1500
+mtu-disc yes
+mtu-test
+mssfix 0
+push \042mssfix 0\042
 #push \042tun-mtu 1492\042
 
 #management 0.0.0.0 7000 /etc/openvpn/management-password
@@ -266,7 +264,7 @@ cipher $CIPHER
 auth SHA256
 
 #uncomment for 2.4.x feature to disable automatically negotiate in AES-256-GCM
-#ncp-disable
+ncp-disable
 
 #max-clients 300
 
@@ -276,8 +274,8 @@ auth SHA256
 persist-key
 persist-tun
 
-status /etc/openvpn/logs/openvpn-status.log
-log-append /etc/openvpn/logs/openvpn.log
+status /var/log/openvpn-status.log
+log-append /var/log/openvpn.log
 
 verb 2
 #reneg-sec 864000
@@ -290,36 +288,29 @@ sndbuf 1048576
 rcvbuf 1048576
 push \042sndbuf 1048576\042
 push \042rcvbuf 1048576\042
-" >> /etc/openvpn/server.conf
+"
 
-echo "<ca>"  >> /etc/openvpn/server.conf
-cat $EASYRSA_PKI/ca.crt >> /etc/openvpn/server.conf
-echo "</ca>" >> /etc/openvpn/server.conf
+    echo "<ca>"
+    cat $EASYRSA_PKI/ca.crt
+    echo "</ca>"
 
-echo "<cert>"  >> /etc/openvpn/server.conf
-cat $EASYRSA_PKI/issued/vpn-server.crt >> /etc/openvpn/server.conf
-echo "</cert>" >> /etc/openvpn/server.conf
+    echo "<cert>"
+    cat $EASYRSA_PKI/issued/vpn-server.crt
+    echo "</cert>"
 
-echo "<key>"  >> /etc/openvpn/server.conf
-cat $EASYRSA_PKI/private/vpn-server.key >> /etc/openvpn/server.conf
-echo "</key>" >> /etc/openvpn/server.conf
+    echo "<key>"
+    cat $EASYRSA_PKI/private/vpn-server.key
+    echo "</key>"
 
-if openvpn --version | grep 2.3; then
-    # ta tls auth OpenVPN 2.3.x
-    echo "key-direction 0" >> /etc/openvpn/server.conf
-    echo "<tls-auth>"  >> /etc/openvpn/server.conf
-    cat $EASYRSA_PKI/ta.key >> /etc/openvpn/server.conf
-    echo "</tls-auth>" >> /etc/openvpn/server.conf
-else
     # ta tls crypt OpenVPN 2.4.x
-    echo "<tls-crypt>"  >> /etc/openvpn/server.conf
-    cat $EASYRSA_PKI/ta.key >> /etc/openvpn/server.conf
-    echo "</tls-crypt>" >> /etc/openvpn/server.conf
-fi
+    echo "<tls-crypt>"
+    cat $EASYRSA_PKI/ta.key
+    echo "</tls-crypt>"
 
-echo "<dh>"  >> /etc/openvpn/server.conf
-cat $EASYRSA_PKI/dh.pem >> /etc/openvpn/server.conf
-echo "</dh>" >> /etc/openvpn/server.conf
+    echo "<dh>"
+    cat $EASYRSA_PKI/dh.pem
+    echo "</dh>"
+} >>/etc/openvpn/server.conf
 
 #create iptables file
 echo "*filter
@@ -348,7 +339,7 @@ COMMIT
 :POSTROUTING ACCEPT [0:0]
 :OUTPUT ACCEPT [0:0]
 -A POSTROUTING -s $NET4 -j SNAT --to-source $EIP
-COMMIT" > /tmp/iptables
+COMMIT" >/tmp/iptables
 
 #create ip6tables file
 echo "*filter
@@ -378,24 +369,16 @@ COMMIT
 :POSTROUTING ACCEPT [0:0]
 :OUTPUT ACCEPT [0:0]
 -A POSTROUTING -s $NET6 -j SNAT --to-source $IIPv6
-COMMIT" > /tmp/ip6tables
+COMMIT" >/tmp/ip6tables
 
 #start services
-
-if cat /etc/*release | grep ^NAME | grep CentOS; then
-     cp /tmp/ip6tables /etc/sysconfig/ip6tables
-     cp /tmp/iptables /etc/sysconfig/iptables
-     systemctl enable iptables & systemctl start iptables
-     systemctl enable ip6tables & systemctl start ip6tables
-     systemctl enable openvpn@server & systemctl start openvpn@server
-     systemctl restart iptables & systemctl restart ip6tables
-elif cat /etc/*release | grep ^NAME | grep Ubuntu; then
-     cp /tmp/ip6tables /etc/iptables/rules.v6
-     cp /tmp/iptables /etc/iptables/rules.v4
-     systemctl enable netfilter-persistent & systemctl start netfilter-persistent
-     systemctl enable openvpn@server & systemctl start openvpn@server
-     systemctl restart netfilter-persistent
-fi
+cp /tmp/ip6tables /etc/iptables/rules.v6
+cp /tmp/iptables /etc/iptables/rules.v4
+systemctl enable netfilter-persistent &
+systemctl start netfilter-persistent
+systemctl enable openvpn@server &
+systemctl start openvpn@server
+systemctl restart netfilter-persistent
 
 #generate client config
 
@@ -421,12 +404,11 @@ resolv-retry infinite
 persist-key
 persist-tun
 comp-lzo
-mssfix max
 auth-nocache
 verb 3
 ping 10
 tls-client
-float" > /etc/openvpn/client.ovpn
+float" >/etc/openvpn/client.ovpn
 
 #generate bash script to create one-file config for clients
 
@@ -438,19 +420,19 @@ echo -e "#! /bin/bash
 # M Solovev - 15/01/20 - Migrate from pkitool EasyRSA 2.x to EasyRSA 3.x
 # Usage: newclient.sh <common-name>
 
-echo \042Script to generate unified config for OprnVPN Apps\042
+echo \042Script to generate unified config for OpenVPN Apps\042
 echo \042sage: newclient.sh <common-name>\042
 
 # Set vars
 OPENVPN_DIR=/etc/openvpn
-OPENVPN_RSA_DIR=/etc/openvpn/easy-rsa
-OPENVPN_KEYS=\044OPENVPN_RSA_DIR/keys
-BUNDLE_DIR=/etc/openvpn/bundles
+EASY_RSA=\044OPENVPN_DIR/easy-rsa
+EASYRSA_PKI=\044EASY_RSA/pki
+BUNDLE_DIR=\044OPENVPN_DIR/bundles
 
 # Either read the CN from \0441 or prompt for it
 if [ -z \042\0441\042 ]
     then echo -n \042Enter new client common name (CN): \042
-    read -e CN
+    read -er CN
 else
     CN=\u00241
 fi
@@ -458,80 +440,47 @@ fi
 # Ensure CN isn't blank
 if [ -z \042\044CN\042 ]
     then echo \042You must provide a CN.\042
-    exit
+    exit 1
 fi
 
 # Check the CN doesn't already exist
-if [ -f \044OPENVPN_KEYS/\044CN.crt ]
+if [ -f \044EASYRSA_PKI/issued/\044CN.crt ]
     then echo \042Error: certificate with the CN \044CN alread exists!\042
-    echo \042    \044OPENVPN_KEYS/\044CN.crt\042
+    echo \042    \044EASYRSA_PKI/issued/\044CN.crt\042
     exit
 fi
 
-# Establish the default variables
-export EASY_RSA=\042/etc/openvpn/easy-rsa\042
-export OPENSSL=\042openssl\042
-export PKCS11TOOL=\042pkcs11-tool\042
-export GREP=\042grep\042
-export KEY_CONFIG=\x60\044EASY_RSA/whichopensslcnf \044EASY_RSA\x60
-export KEY_DIR=\042\044EASY_RSA/keys\042
-export PKCS11_MODULE_PATH=\042dummy\042
-export PKCS11_PIN=\042dummy\042
-export KEY_SIZE=2048
-export CA_EXPIRE=3650
-export KEY_EXPIRE=1825
-export KEY_COUNTRY=\042US\042
-export KEY_PROVINCE=\042CA\042
-export KEY_CITY=\042SanFrancisco\042
-export KEY_ORG=\042Fort-Funston\042
-export KEY_EMAIL=\042my@vpn.net\042
-export KEY_OU=\042MyVPN\042
-export KEY_NAME=\042EasyRSA\042
-
-# Copied from build-key script (to ensure it works!)
-export EASY_RSA=\042\044{EASY_RSA:-.}\042
-\042\044EASY_RSA/pkitool\042 --batch \044CN
+# Generating Full Client package
+\042/etc/openvpn/easy-rsa/easyrsa\042 build-client-full \044CN nopass
 
 # Add all certs to unified client config file
 
 # Default config for client
 cp \044OPENVPN_DIR/client.ovpn \044BUNDLE_DIR/\044CN.ovpn
 
-# CA
-echo \042<ca>\042  >> \044BUNDLE_DIR/\044CN.ovpn
-cat \044OPENVPN_KEYS/ca.crt >> \044BUNDLE_DIR/\044CN.ovpn
-echo \042</ca>\042 >> \044BUNDLE_DIR/\044CN.ovpn
+{
+    # CA
+    echo \042<ca>\042
+    cat \044EASYRSA_PKI/ca.crt
+    echo \042</ca>\042
 
-# Client cert
-echo \042<cert>\042 >> \044BUNDLE_DIR/\044CN.ovpn
-cat \044OPENVPN_KEYS/\044CN.crt >> \044BUNDLE_DIR/\044CN.ovpn
-echo \042</cert>\042 >> \044BUNDLE_DIR/\044CN.ovpn
+    # Client cert
+    echo \042<cert>\042
+    cat \044EASYRSA_PKI/issued/\044CN.crt
+    echo \042</cert>\042
 
-# Client key
-echo \042<key>\042 >> \044BUNDLE_DIR/\044CN.ovpn
-cat \044OPENVPN_KEYS/\044CN.key >> \044BUNDLE_DIR/\044CN.ovpn
-echo \042</key>\042 >> \044BUNDLE_DIR/\044CN.ovpn
+    # Client key
+    echo \042<key>\042
+    cat \044EASYRSA_PKI/private/\044CN.key
+    echo \042</key>\042
 
-if openvpn --version | grep 2.3; then
-    # ta tls auth OpenVPN 2.3.x
-    echo \042key-direction 1\042 >> \044BUNDLE_DIR/\044CN.ovpn
-    echo \042<tls-auth>\042  >> \044BUNDLE_DIR/\044CN.ovpn
-    cat \044OPENVPN_KEYS/ta.key >> \044BUNDLE_DIR/\044CN.ovpn
-    echo \042</tls-auth>\042 >> \044BUNDLE_DIR/\044CN.ovpn
-else
     # ta tls crypt OpenVPN 2.4.x
-    echo \042<tls-crypt>\042  >> \044BUNDLE_DIR/\044CN.ovpn
-    cat \044OPENVPN_KEYS/ta.key >> \044BUNDLE_DIR/\044CN.ovpn
-    echo \042</tls-crypt>\042 >> \044BUNDLE_DIR/\044CN.ovpn
-fi
+    echo \042<tls-crypt>\042
+    cat \044EASYRSA_PKI/ta.key
+    echo \042</tls-crypt>\042
+} >> \044BUNDLE_DIR/\044CN.ovpn
 
-# DH key
-echo \042<dh>\042 >> \044BUNDLE_DIR/\044CN.ovpn
-cat \044OPENVPN_KEYS/dh.pem >> \044BUNDLE_DIR/\044CN.ovpn
-echo \042</dh>\042 >> \044BUNDLE_DIR/\044CN.ovpn
-
-#echo \042\042
-echo \042COMPLETE! Copy the new unified config from here: /etc/openvpn/bundles/\044CN.ovpn\042" > /etc/openvpn/newclient.sh
+echo \042COMPLETE! Copy the new unified config from here: /etc/openvpn/bundles/\044CN.ovpn\042" >/etc/openvpn/newclient.sh
 chmod +x /etc/openvpn/newclient.sh
 
 echo "Setup is complete. Happy VPNing!"
