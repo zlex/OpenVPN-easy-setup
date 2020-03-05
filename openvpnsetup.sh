@@ -417,22 +417,22 @@ EASYRSA_PKI=\${EASY_RSA}/pki
 BUNDLE_DIR=\${OPENVPN_DIR}/bundles
 
 # Either read the CN from \$1 or prompt for it
-if [ -z \"\$1\" ]
-    then echo -n \"Enter new client common name (CN): \"
+if [[ -z \"\$1\" ]]; then
+    echo -n \"Enter new client common name (CN): \"
     read -er CN
 else
     CN=\$1
 fi
 
 # Ensure CN isn't blank
-if [ -z \${CN} ]
-    then echo \"You must provide a CN.\"
+if [[ -z \${CN} ]]; then
+    echo \"You must provide a CN.\"
     exit 1
 fi
 
 # Check the CN doesn't already exist
-if [ -f \${EASYRSA_PKI}/issued/\${CN}.crt ]
-    then echo \"Error: certificate with the CN \${CN} already exists!\"
+if [[ -f \${EASYRSA_PKI}/issued/\${CN}.crt ]]; then
+    echo \"Error: certificate with the CN \${CN} already exists!\"
     echo \"    \${EASYRSA_PKI}/issued/\${CN}.crt\"
     exit 1
 fi
