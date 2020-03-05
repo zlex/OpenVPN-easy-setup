@@ -7,8 +7,9 @@
 #
 # Version 0.21  March 2020
 #
-# Use only on fresh installed machine! It can rewrite your firewall rules
-# or your current OpenVPN config (if you have it before).
+# Use only on fresh installed machine! It rewrites your firewall rules
+# and your current OpenVPN config (if you have it before).
+# Change SSH Port in config params to prevent whole server denied from internet
 #
 # Script is licensed under the GNU General Public License v3.0
 #
@@ -19,7 +20,7 @@ NET6="fd60:1:1:1::/64" #can generate yours at https://simpledns.plus/private-ipv
 NET4="192.168.100.0/24"
 DNS1="192.168.100.1"
 DNS2="fd60:1:1:1::1"
-SSHPORT=22
+SSHPORT=22 #SSH Port for netfilter rules to allow connect without VPND
 export OPENVPN_DIR=/etc/openvpn
 export EASYRSA=$OPENVPN_DIR/easy-rsa
 export EASYRSA_PKI=$EASYRSA/pki
@@ -29,7 +30,7 @@ export EASYRSA_PKI=$EASYRSA/pki
 #PORT="udp 1194"
 #CIPHER=AES-256-GCM
 #IPV6E=1
-NO_PASS="nopass" # Generete CA key without password
+NO_PASS="nopass" # Generete CA key without password, comment this string to secure youre ca.key by password
 
 #check for root
 IAM=$(whoami)
@@ -58,7 +59,7 @@ fi
 deb_packages="openssl openvpn easy-rsa iptables netfilter-persistent iptables-persistent curl"
 
 if cat /etc/*release | grep ^NAME | grep "Debian\|Ubuntu"; then
-    apt-get install -y "$deb_packages"
+    apt-get install -y $deb_packages
     if hash ufw 2>/dev/null; then
         ufw disable
     else
@@ -76,7 +77,7 @@ if [ -z "$IP" ]; then
     #external IP
     EIP=$(curl -s checkip.dyndns.org | sed -e 's/.*Current IP Address: //' -e 's/<.*$//')
     #internal IPv6 with mask
-    IIPv6=$(ip -6 addr | grep inet6 | awk -F '[ \t]+|/' '{print $3}' | grep -v ^::1 | grep -v ^fe80)
+    IIPv6=$(ip -6 addr | grep inet6 | awk -F '[ \t]+|/' '{print $3}' | grep -v ^::1 | grep -v "^fe80\|^fd60")
 
     echo "Select server IP to listen on (only used for IPv4):
     1) Internal IP - $IIP (in case you are behind NAT)
@@ -142,6 +143,9 @@ fi
 
 echo "Check your selection"
 echo "Server will listen on $IP"
+if (("$IPV6E" == 1)); then
+    echo "Server will listen IPv6 on $IIPv6"
+fi
 echo "Server will listen on $PORT"
 echo "Server will use $CIPHER cipher"
 echo "IPv6 - $IPV6E (1 is enabled, 0 is disabled)"
@@ -422,7 +426,7 @@ echo -e "#! /bin/bash
 # Usage: newclient.sh <common-name>
 
 echo \042Script to generate unified config for OpenVPN Apps\042
-echo \042sage: newclient.sh <common-name>\042
+echo \042Usage: newclient.sh <common-name>\042
 
 # Set vars
 OPENVPN_DIR=$OPENVPN_DIR
@@ -448,7 +452,7 @@ fi
 if [ -f \044EASYRSA_PKI/issued/\044CN.crt ]
     then echo \042Error: certificate with the CN \044CN alread exists!\042
     echo \042    \044EASYRSA_PKI/issued/\044CN.crt\042
-    exit
+    exit 1
 fi
 
 # Generating Full Client package
