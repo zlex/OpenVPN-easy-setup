@@ -251,12 +251,10 @@ push \042dhcp-option DNS $DNS2\042
 comp-lzo adaptive
 push \042comp-lzo adaptive\042
 
-#tun-mtu 1500
 mtu-disc yes
 mtu-test
-mssfix 0
-push \042mssfix 0\042
-#push \042tun-mtu 1492\042
+mssfix max
+mute-replay-warnings
 
 #management 0.0.0.0 7000 $OPENVPN_DIR/management-password
 
@@ -293,29 +291,13 @@ sndbuf 1048576
 rcvbuf 1048576
 push \042sndbuf 1048576\042
 push \042rcvbuf 1048576\042
-"
 
-    echo "<ca>"
-    cat $EASYRSA_PKI/ca.crt
-    echo "</ca>"
-
-    echo "<cert>"
-    cat $EASYRSA_PKI/issued/vpn-server.crt
-    echo "</cert>"
-
-    echo "<key>"
-    cat $EASYRSA_PKI/private/vpn-server.key
-    echo "</key>"
-
-    # ta tls crypt OpenVPN 2.4.x
-    echo "<tls-crypt>"
-    cat $EASYRSA_PKI/ta.key
-    echo "</tls-crypt>"
-
-    echo "<dh>"
-    cat $EASYRSA_PKI/dh.pem
-    echo "</dh>"
-} >>$OPENVPN_DIR/server.conf
+ca $EASYRSA_PKI/ca.crt
+cert $EASYRSA_PKI/issued/vpn-server.crt
+key $EASYRSA_PKI/private/vpn-server.key
+tls-crypt $EASYRSA_PKI/ta.key
+dh $EASYRSA_PKI/dh.pem
+" >>$OPENVPN_DIR/server.conf
 
 #create iptables file
 echo "*filter
