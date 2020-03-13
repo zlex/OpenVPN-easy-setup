@@ -73,6 +73,8 @@ fi
 #server settings
 #external IP
 EIP=$(curl -s checkip.dyndns.org | sed -e 's/.*Current IP Address: //' -e 's/<.*$//')
+#external IPv6
+IIPv6=$(ip -6 addr | grep inet6 | awk -F '[ \t]+|/' '{print $3}' | grep -v ^::1 | grep -v "^fe80\|^fd60")
 if [[ -z ${IP+x} ]]; then
     #internal IP
     IIP=$(hostname -I)
