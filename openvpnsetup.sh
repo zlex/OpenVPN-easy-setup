@@ -20,6 +20,8 @@ NET6="fd60:1:1:1::/64" #can generate yours at https://simpledns.plus/private-ipv
 NET4="192.168.100.0/24"
 DNS1="8.8.8.8"
 DNS2="8.8.4.4"
+#DNS1="195.208.4.1" # a.res-nsdi.ru
+#DNS2="195.208.5.1" # b.res-nsdi.ru
 SSHPORT=22 #SSH Port for netfilter rules to allow connect without VPN
 export OPENVPN_DIR=/etc/openvpn
 export EASYRSA=${OPENVPN_DIR}/easy-rsa
@@ -254,7 +256,8 @@ comp-lzo adaptive
 push \"comp-lzo adaptive\"
 
 mtu-disc yes
-mtu-test
+#mtu-test only makes sense with --proto udp
+#mtu-test
 mssfix max
 mute-replay-warnings
 
@@ -288,11 +291,15 @@ mute 3
 tls-server
 #script-security 3
 
+#tcp 443 better perfomance
+txqueuelen 2000
+#set ifconfig eth0 txqueuelen 2000
+
 #buffers
-sndbuf 1048576
-rcvbuf 1048576
-push \"sndbuf 1048576\"
-push \"rcvbuf 1048576\"
+sndbuf 0
+rcvbuf 0
+push \"sndbuf 0\"
+push \"rcvbuf 0\"
 
 ca ${EASYRSA_PKI}/ca.crt
 cert ${EASYRSA_PKI}/issued/vpn-server.crt
